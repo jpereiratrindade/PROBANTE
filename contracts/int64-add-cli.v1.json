@@ -1,0 +1,23 @@
+{
+  "schema_version": "1",
+  "id": "FAM-001/int64-add-cli",
+  "version": "1.0.0",
+  "description": "Soma exata de dois inteiros decimais assinados de 64 bits",
+  "scope": "Comportamento observavel da CLI nos doze casos definidos",
+  "preconditions": ["Linux", "Bubblewrap rootless com namespaces user, PID, mount e network", "locale C"],
+  "timeout_ms": 2000,
+  "cases": [
+    {"id":"C01","description":"zeros","arguments":["0","0"],"expected":{"exit_code":0,"stdout":"0\n","stderr":""}},
+    {"id":"C02","description":"positivos","arguments":["7","5"],"expected":{"exit_code":0,"stdout":"12\n","stderr":""}},
+    {"id":"C03","description":"sinais mistos","arguments":["-7","5"],"expected":{"exit_code":0,"stdout":"-2\n","stderr":""}},
+    {"id":"C04","description":"negativos","arguments":["-7","-5"],"expected":{"exit_code":0,"stdout":"-12\n","stderr":""}},
+    {"id":"C05","description":"maximo","arguments":["9223372036854775807","0"],"expected":{"exit_code":0,"stdout":"9223372036854775807\n","stderr":""}},
+    {"id":"C06","description":"minimo","arguments":["-9223372036854775808","0"],"expected":{"exit_code":0,"stdout":"-9223372036854775808\n","stderr":""}},
+    {"id":"C07","description":"overflow positivo","arguments":["9223372036854775807","1"],"expected":{"exit_code":3,"stdout":"","stderr":"OVERFLOW\n"}},
+    {"id":"C08","description":"overflow negativo","arguments":["-9223372036854775808","-1"],"expected":{"exit_code":3,"stdout":"","stderr":"OVERFLOW\n"}},
+    {"id":"C09","description":"nao decimal","arguments":["abc","2"],"expected":{"exit_code":2,"stdout":"","stderr":"INVALID_INPUT\n"}},
+    {"id":"C10","description":"argumento ausente","arguments":["5"],"expected":{"exit_code":2,"stdout":"","stderr":"INVALID_INPUT\n"}},
+    {"id":"C11","description":"argumento excedente","arguments":["1","2","3"],"expected":{"exit_code":2,"stdout":"","stderr":"INVALID_INPUT\n"}},
+    {"id":"C12","description":"argumento vazio","arguments":["","2"],"expected":{"exit_code":2,"stdout":"","stderr":"INVALID_INPUT\n"}}
+  ]
+}

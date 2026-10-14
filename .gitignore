@@ -1,0 +1,7 @@
+/build/
+/build-analyzer/
+/.runs/
+/.cache/
+*.tmp
+*.swp
+.env

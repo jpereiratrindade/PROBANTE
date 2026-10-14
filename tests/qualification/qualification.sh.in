@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -uo pipefail
+p='@CMAKE_BINARY_DIR@/probante'
+f='@CMAKE_BINARY_DIR@/fixtures'
+c='@CMAKE_SOURCE_DIR@/contracts/int64-add-cli.v1.json'
+bad='@CMAKE_SOURCE_DIR@/tests/qualification/invalid-contract.json'
+r='@CMAKE_BINARY_DIR@/qualification-runs'
+fail=0
+rm -rf "$r"; mkdir -p "$r"
+run_expect() {
+  local name=$1 expected_rc=$2 target=$3 needle=$4
+  local out="$r/$name.json"
+  "$p" verify --target "$target" --contract "$c" --evidence-dir "$r/evidence" >"$out"; local rc=$?
+  if [[ $rc -ne $expected_rc ]] || ! grep -q "$needle" "$out"; then echo "FAIL $name rc=$rc expected=$expected_rc needle=$needle"; fail=1; else echo "PASS $name"; fi
+}
+run_expect correct 0 "$f/int64-add-correct" '"verdict":"PASS"'
+run_expect m01 1 "$f/int64-add-m01-arithmetic" 'STDOUT_MISMATCH'
+run_expect m02 1 "$f/int64-add-m02-overflow" 'EXIT_CODE_MISMATCH'
+run_expect m03 1 "$f/int64-add-m03-invalid" 'EXIT_CODE_MISMATCH'
+run_expect m04 1 "$f/int64-add-m04-extra-text" 'STDOUT_MISMATCH'
+run_expect m05 1 "$f/int64-add-m05-hang" 'TIMEOUT'
+sleep 0.1
+if pgrep -f "$f/int64-add-m05-hang" >/dev/null; then echo 'FAIL m05 descendant survived'; fail=1; fi
+printf 'ORIGINAL\n' >/tmp/probante-m06-sentinel
+run_expect m06 0 "$f/int64-add-m06-write" '"verdict":"PASS"'
+[[ $(cat /tmp/probante-m06-sentinel) == ORIGINAL ]] || { echo 'FAIL m06 host sentinel changed'; fail=1; }
+run_expect output-limit 1 "$f/int64-add-output-limit" 'OUTPUT_LIMIT_EXCEEDED'
+run_expect crash 1 "$f/int64-add-crash" 'EXIT_CODE_MISMATCH'
+space="$r/path with spaces";mkdir -p "$space";cp "$f/int64-add-correct" "$space/target correct"
+run_expect spaces 0 "$space/target correct" '"verdict":"PASS"'
+PATH=/definitely-absent "$p" verify --target "$f/int64-add-correct" --contract "$c" --evidence-dir "$r/m07" >"$r/m07.json"; rc=$?
+[[ $rc -eq 2 ]] && grep -q '"verdict":"BLOCKED"' "$r/m07.json" && grep -q '"cases":\[\]' "$r/m07.json" || { echo 'FAIL m07 fail-closed';fail=1; }
+[[ $rc -eq 2 ]] && echo 'PASS m07'
+marker="$r/m08-launched"; rm -f "$marker"
+probe="$r/launch-probe.sh"
+printf '#!/usr/bin/env bash\ntouch %q\n' "$marker" >"$probe"; chmod +x "$probe"
+"$p" verify --target "$probe" --contract "$bad" --evidence-dir "$r/m08" >"$r/m08.json"; rc=$?
+[[ $rc -eq 3 ]] && grep -q INVALID_REQUEST "$r/m08.json" || { echo 'FAIL m08 invalid contract';fail=1; }
+[[ ! -e $marker ]] || { echo 'FAIL m08 target launched'; fail=1; }
+[[ $rc -eq 3 && ! -e $marker ]] && echo 'PASS m08'
+run_expect repeat 0 "$f/int64-add-correct" '"verdict":"PASS"'
+first=$(grep -o '"evidence_path":"[^"]*' "$r/correct.json" | cut -d'"' -f4)
+result="$first/result.json"; before=$(sha256sum "$result"|cut -d' ' -f1); printf 'tamper\n' >>"$result"; after=$(sha256sum "$result"|cut -d' ' -f1)
+[[ $before != "$after" ]] || { echo 'FAIL tamper not detectable';fail=1; }
+manifest_hash=$(grep -o "$before" "$first/manifest.json" || true)
+[[ -n $manifest_hash ]] || { echo 'FAIL manifest lacks original result hash';fail=1; }
+[[ -n $manifest_hash && $before != "$after" ]] && echo 'PASS tamper-detection'
+exit "$fail"

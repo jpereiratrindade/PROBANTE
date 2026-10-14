@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://probante.local/schemas/result-v1.schema.json",
+  "type": "object",
+  "required": ["schema_version", "probante_version", "request_id", "verdict", "limitation", "target", "contract", "isolation", "cases"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "verdict": {"enum": ["PASS", "FAIL", "BLOCKED", "INVALID_REQUEST"]},
+    "cases": {"type": "array"}
+  }
+}
+
